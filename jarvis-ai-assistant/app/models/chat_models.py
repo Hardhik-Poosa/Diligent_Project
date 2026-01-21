@@ -9,5 +9,5 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     session_id: str
-    answer: str
+    message: str
     sources: List[str]

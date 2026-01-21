@@ -15,6 +15,6 @@ def chat_endpoint(request: ChatRequest):
 
     return ChatResponse(
         session_id=session_id,
-        answer=answer,
+        message=answer,
         sources=sources
     )
