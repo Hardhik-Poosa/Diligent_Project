@@ -1,10 +1,7 @@
-fastapi
-uvicorn
-streamlit
-requests
-python-dotenv
-sentence-transformers
-transformers
-torch
-pinecone-client
-pydantic
+fastapi==0.121.3
+uvicorn==0.38.0
+requests==2.32.5
+sentence-transformers==5.2.0
+pinecone==8.0.0
+python-dotenv==1.2.1
+pydantic==2.12.4

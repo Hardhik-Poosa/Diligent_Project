@@ -10,4 +10,4 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     answer: str
-    sources: List[str] = []
+    sources: List[str]

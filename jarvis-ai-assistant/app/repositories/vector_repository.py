@@ -1,63 +1,57 @@
-import logging
-import faiss
-import numpy as np
-
-logger = logging.getLogger(__name__)
+import os
+from pinecone import Pinecone
 
 
 class VectorRepository:
-    """Vector repository for managing embeddings using FAISS"""
-    
     def __init__(self, dimension: int = 384):
-        """Initialize FAISS index with specified dimension"""
         try:
-            logger.info(f"Initializing VectorRepository with dimension: {dimension}")
-            self.index = faiss.IndexFlatL2(dimension)
-            self.texts = []
-            self.dimension = dimension
-            logger.info("VectorRepository initialized successfully")
+            api_key = os.getenv("PINECONE_API_KEY")
+            if not api_key or api_key == "your_real_key_here":
+                raise ValueError("PINECONE_API_KEY not configured or is placeholder")
+            
+            pc = Pinecone(api_key=api_key)
+            index_name = os.getenv("PINECONE_INDEX_NAME", "jarvis-index")
+
+            try:
+                if index_name not in pc.list_indexes().names():
+                    pc.create_index(
+                        name=index_name,
+                        dimension=dimension,
+                        metric="cosine"
+                    )
+            except Exception as e:
+                print(f"Warning: Could not create/list indexes: {e}")
+
+            self.index = pc.Index(index_name)
         except Exception as e:
-            logger.error(f"Error initializing VectorRepository: {e}", exc_info=True)
-            raise
+            print(f"Warning: Pinecone not available: {e}. Using mock index.")
+            self.index = None
 
     def add_vector(self, embedding: list[float], text: str):
-        """Add embedding and associated text to the index"""
+        if self.index is None:
+            return
         try:
-            if not embedding:
-                logger.warning(f"Empty embedding provided for text: {text[:50]}...")
-                return
-            
-            if len(embedding) != self.dimension:
-                logger.warning(f"Embedding dimension {len(embedding)} does not match index dimension {self.dimension}")
-                return
-            
-            logger.debug(f"Adding vector for text: {text[:50]}...")
-            self.index.add(np.array([embedding]).astype("float32"))
-            self.texts.append(text)
-            logger.debug(f"Vector added. Total vectors: {self.index.ntotal}")
+            self.index.upsert([
+                (
+                    str(hash(text)),
+                    embedding,
+                    {"content": text}
+                )
+            ])
         except Exception as e:
-            logger.error(f"Error adding vector: {e}", exc_info=True)
-            raise
+            print(f"Warning: Could not add vector: {e}")
 
     def search(self, embedding: list[float], top_k: int = 3):
-        """Search for top-k similar vectors"""
+        if self.index is None:
+            return []
         try:
-            if self.index.ntotal == 0:
-                logger.warning("Vector index is empty")
-                return []
-            
-            if len(embedding) != self.dimension:
-                logger.warning(f"Query embedding dimension {len(embedding)} does not match index dimension {self.dimension}")
-                return []
-            
-            logger.debug(f"Searching for top-{top_k} similar vectors")
-            distances, indices = self.index.search(
-                np.array([embedding]).astype("float32"), top_k
+            results = self.index.query(
+                vector=embedding,
+                top_k=top_k,
+                include_metadata=True
             )
-            
-            results = [self.texts[i] for i in indices[0]]
-            logger.info(f"Search returned {len(results)} results with distances: {distances[0].tolist()}")
-            return results
+
+            return [m.metadata["content"] for m in results.matches]
         except Exception as e:
-            logger.error(f"Error searching vectors: {e}", exc_info=True)
-            raise
+            print(f"Warning: Could not search vectors: {e}")
+            return []
